@@ -182,6 +182,24 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                                     close = Some(i);
                                 }
                             }
+
+                            #[cfg(not(target_arch = "wasm32"))]
+                            if let Some((from, true)) = dragged
+                                && close.is_none()
+                                && action.is_none()
+                                && let Some(id) = app.views.get(from).map(|v| v.id)
+                                && let Some(row) = slots.iter().find(|(i, _)| *i == from).map(|(_, r)| *r)
+                            {
+                                let screen = ui.ctx().content_rect();
+                                // No pointer position means it was released outside the window.
+                                let torn_off = ui
+                                    .ctx()
+                                    .pointer_latest_pos()
+                                    .is_none_or(|p| p.y > row.bottom() + TEAR_OFF_DISTANCE || !screen.contains(p));
+                                if torn_off {
+                                    action = Some(crate::tab_context::Action::Detach(id));
+                                }
+                            }
                             // Dragging a tab moves it (#1537): a line marks the gap it will land
                             // in, and releasing the button drops it there.
                             if let Some((from, released)) = dragged
@@ -342,6 +360,8 @@ fn tabs_overflow(natural: &[f32], budget: f32, gap: f32, min: f32) -> bool {
 /// How close to either end of a scrolling strip a dragged tab scrolls it, and how far per frame.
 const TAB_DRAG_EDGE: f32 = 24.0;
 const TAB_DRAG_STEP: f32 = 8.0;
+/// A tab released this far below the tab strip, or outside the window, opens in a new window.
+const TEAR_OFF_DISTANCE: f32 = 48.0;
 
 /// Where the tab at `from` lands when dropped with the pointer at `x`: past every other tab
 /// whose centre is left of the pointer. `slots` are the tabs' indices and rects, in order.

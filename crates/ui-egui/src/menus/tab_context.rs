@@ -5,6 +5,7 @@ pub(crate) enum Action {
     Close(DocId),
     Reopen,
     Reveal(DocId),
+    Detach(DocId),
 }
 
 impl crate::PdfCraftApp {
@@ -43,6 +44,40 @@ impl crate::PdfCraftApp {
                 #[cfg(target_arch = "wasm32")]
                 let _ = id;
             }
+            Action::Detach(id) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                self.detach_tab(id);
+                #[cfg(target_arch = "wasm32")]
+                let _ = id;
+            }
+        }
+    }
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl crate::PdfCraftApp {
+    /// Opens the tab's file in a new PdfCraft window, then closes the tab here.
+    fn detach_tab(&mut self, id: DocId) {
+        let Some(index) = self.views.iter().position(|v| v.id == id) else { return };
+        let path = self.session.get(id).and_then(|d| d.path.clone());
+        let Some(path) = path else {
+            self.notify_error("Save this document before moving it to its own window");
+            return;
+        };
+        // The new window reads the file from disk, so unsaved edits would be lost.
+        if self.has_unsaved_work(index) {
+            self.notify_error("Save your changes before moving this tab to its own window");
+            return;
+        }
+        let exe = match std::env::current_exe() {
+            Ok(exe) => exe,
+            Err(e) => {
+                self.notify_error(format!("Could not start a new window: {e}"));
+                return;
+            }
+        };
+        match std::process::Command::new(exe).arg("--new-window").arg(&path).spawn() {
+            Ok(_) => self.close_tab(index),
+            Err(e) => self.notify_error(format!("Could not start a new window: {e}")),
         }
     }
 }
