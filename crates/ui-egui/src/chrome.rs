@@ -541,6 +541,10 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         if icons::button(ui, "info", 32.0, false, &tip).clicked() {
                             app.dialog = Some(Dialog::Properties(PropsTab::Description));
                         }
+                                                if icons::button(ui, "maximize-2", 32.0, false, "Focus mode (F11)").clicked() {
+                            app.focus_level = 1;
+                            app.focus_tools_open = false;
+                        }
                     });
                     ui.add_space(8.0);
                     if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {

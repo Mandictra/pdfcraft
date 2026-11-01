@@ -150,6 +150,7 @@ impl PdfCraftApp {
             unlock_prompt: None,
             full_screen: false,
             focus_level: 0,
+            focus_tools_open: false,
             inbox: Default::default(),
             startup_inbox: Default::default(),
             startup_superseded: false,
@@ -615,6 +616,9 @@ impl eframe::App for PdfCraftApp {
         // With no document open there is nothing to focus on.
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F11)) && self.active.is_some() {
             self.focus_level = (self.focus_level + 1) % 3;
+            if self.focus_level == 1 {
+                self.focus_tools_open = false;
+            }
         }
         if self.active.is_none() {
             self.focus_level = 0;

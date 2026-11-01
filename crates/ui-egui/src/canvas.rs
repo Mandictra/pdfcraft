@@ -45,7 +45,7 @@ use area::{
 };
 #[cfg(test)]
 use bars::in_size_hint_zone;
-use bars::{Notice, notices, page_size_hint, quick_bar};
+use bars::{Notice, focus_notch, notices, page_size_hint, quick_bar};
 pub use cache::RasterMemory;
 pub(crate) use cache::{BASE_SIDE, TILE_THRESHOLD, texture_image, thumbnail_rows};
 #[cfg(test)]
@@ -3479,7 +3479,12 @@ fn apply_frame_requests(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, 
     // Read mode hides the tools (#2646), and full screen is the page and nothing else (#1459);
     // the quick tools come back with the window.
     if app.mode != crate::Mode::Read && !app.full_screen {
-        quick_bar(app, avail, ui);
+        if app.focus_level > 0 {
+            focus_notch(app, avail, ui);
+        }
+        if app.focus_level == 0 || app.focus_tools_open {
+            quick_bar(app, avail, ui);
+        }
     }
     if let Some((source, file, destination)) = remote_open {
         app.open_remote_link(source, file, destination);

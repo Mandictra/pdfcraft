@@ -276,6 +276,31 @@ fn notice_bar(ui: &mut egui::Ui, t: &Tokens, icon: &str, icon_color: Color32, te
     });
 }
 
+/// Focus mode: the quick tools fold into a small tab on the left edge. Click it to unfold the
+/// bar; the tab then sits beside the bar and folds it again.
+pub(super) fn focus_notch(app: &mut PdfCraftApp, area: Rect, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    let open = app.focus_tools_open;
+    let size = vec2(18.0, 52.0);
+    let pos = area.left_top() + vec2(if open { 60.0 } else { 0.0 }, 14.0);
+    egui::Area::new(egui::Id::unique("focus-notch")).order(egui::Order::Middle).fixed_pos(pos).show(ui.ctx(), |ui| {
+        let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+        let response = theme::hand(response.on_hover_text(if open { "Hide tools" } else { "Show tools" }));
+        let hovered = response.hovered();
+        ui.painter().add(egui::Shape::rect_filled(
+            rect,
+            CornerRadius { nw: 0, ne: 9, sw: 0, se: 9 },
+            if hovered { t.accent } else { t.border },
+        ));
+        let icon = if open { "chevron-left" } else { "chevron-right" };
+        let ink = if hovered { Color32::WHITE } else { t.text };
+        icons::paint(ui, Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), icon, 14.0, ink);
+        if response.clicked() {
+            app.focus_tools_open = !open;
+        }
+    });
+}
+
 /// The floating quick-action bar at the left edge of the document area.
 pub(super) fn quick_bar(app: &mut PdfCraftApp, area: Rect, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());

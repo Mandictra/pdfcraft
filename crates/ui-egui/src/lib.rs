@@ -402,6 +402,8 @@ pub struct PdfCraftApp {
     /// Files delivered asynchronously (web drag-and-drop, web file picker).
         /// Focus mode (F11): 0 off, 1 hides the menus and side panels, 2 also the tab strip.
     pub focus_level: u8,
+        /// Focus mode: whether the quick tools are unfolded from their edge tab.
+    pub focus_tools_open: bool,
     pub inbox: Inbox,
     /// The browser's startup `?file=` download. Unlike a deliberate Open or drop, a late
     /// arrival opens in the background once the user has started working (#171).
