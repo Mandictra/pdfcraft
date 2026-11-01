@@ -74,6 +74,7 @@ mod hooks;
 mod persist;
 mod platform;
 mod state;
+mod split;
 mod tools;
 mod workflows;
 
@@ -404,6 +405,9 @@ pub struct PdfCraftApp {
     pub focus_level: u8,
         /// Focus mode: whether the quick tools are unfolded from their edge tab.
     pub focus_tools_open: bool,
+        /// Split view: the documents in the left and right panes, and which pane has the focus.
+    pub split: Option<[pdfcraft_engine::DocId; 2]>,
+    pub split_focus: usize,
     pub inbox: Inbox,
     /// The browser's startup `?file=` download. Unlike a deliberate Open or drop, a late
     /// arrival opens in the background once the user has started working (#171).

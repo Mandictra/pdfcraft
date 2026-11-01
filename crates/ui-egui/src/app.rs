@@ -151,6 +151,8 @@ impl PdfCraftApp {
             full_screen: false,
             focus_level: 0,
             focus_tools_open: false,
+            split: None,
+            split_focus: 0,
             inbox: Default::default(),
             startup_inbox: Default::default(),
             startup_superseded: false,
@@ -623,6 +625,11 @@ impl eframe::App for PdfCraftApp {
         if self.active.is_none() {
             self.focus_level = 0;
         }
+                // Ctrl+\ splits the window into two documents, or ends the split.
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Backslash)) {
+            crate::split::toggle_split(self);
+        }
+        crate::split::reconcile(self);
         if self.focus_level < 2 {
             chrome::tab_strip(self, ui);
         }
@@ -646,6 +653,7 @@ impl eframe::App for PdfCraftApp {
                     None => home::show(self, ui),
                     Some(index) => match compare_ui::side_by_side(self, index) {
                         Some((old, new)) => compare_ui::compare_area(self, old, new, ui),
+                        None if self.split.is_some() => crate::split::split_area(self, ui),
                         None => canvas::document_area(self, index, ui),
                     },
                 }

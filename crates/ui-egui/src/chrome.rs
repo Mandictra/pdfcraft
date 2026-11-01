@@ -545,6 +545,9 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             app.focus_level = 1;
                             app.focus_tools_open = false;
                         }
+                        if icons::button(ui, "columns-2", 32.0, app.split.is_some(), "Split view (Ctrl+\\)").clicked() {
+                            crate::split::toggle_split(app);
+                        }
                     });
                     ui.add_space(8.0);
                     if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {

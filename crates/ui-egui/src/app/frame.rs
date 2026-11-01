@@ -99,7 +99,11 @@ impl PdfCraftApp {
         // Retire hidden documents before admitting the visible document's textures, so the
         // three cache limits apply to the application, regardless of how many tabs are open.
         // Side by side: the comparison's old file renders alongside the active one.
-        let partner = self.active.and_then(|i| compare_ui::side_by_side(self, i)).map(|(old, _)| old);
+        let partner = self
+            .active
+            .and_then(|i| compare_ui::side_by_side(self, i))
+            .map(|(old, _)| old)
+            .or_else(|| self.split_partner());
         for (i, view) in self.views.iter_mut().enumerate() {
             if Some(i) != self.active
                 && Some(i) != partner
