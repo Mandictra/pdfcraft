@@ -55,10 +55,11 @@ pub(crate) fn reconcile(app: &mut PdfCraftApp) {
     }
 }
 
-/// The two panes, each a page view of its own with a title strip. The pane under a press
-/// becomes the active tab.
+/// The two panes, each a page view of its own with a title strip. The strip is a dropdown that
+/// sets the pane's document to any open one; picking the other pane's document swaps the two.
+/// A press in the other pane makes it the active tab.
 pub(crate) fn split_area(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
-    let Some(pair) = app.split else { return };
+    let Some(mut pair) = app.split else { return };
     let t = Tokens::get(ui.ctx());
     let rect = ui.available_rect_before_wrap();
     let gap = 1.0;
@@ -78,26 +79,54 @@ pub(crate) fn split_area(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         app.active = Some(i);
         app.split_focus = k;
     }
+    // Every open document, for the dropdowns.
+    let docs: Vec<(pdfcraft_engine::DocId, String)> =
+        app.views.iter().filter_map(|v| app.session.get(v.id).map(|d| (v.id, d.name.clone()))).collect();
+    let mut chosen: Option<(usize, pdfcraft_engine::DocId)> = None;
     for (k, r) in halves.into_iter().enumerate() {
         // Drawing a pane can close its tab and shift the indexes: find each pane again by id.
         let Some(index) = app.views.iter().position(|v| v.id == pair[k]) else { return };
-        let name = app.session.get(pair[k]).map(|d| d.name.clone()).unwrap_or_default();
+        let name = docs.iter().find(|(id, _)| *id == pair[k]).map(|(_, n)| n.clone()).unwrap_or_default();
         let caption = egui::Rect::from_min_size(r.min, egui::vec2(r.width(), caption_h));
         let focused = k == app.split_focus;
         ui.painter().rect_filled(caption, 0.0, if focused { t.accent_soft } else { t.panel });
+        let ink = if focused { t.text } else { t.text_muted };
+        let hit = ui.interact(caption, ui.id().with(("split-caption", k)), egui::Sense::click());
         ui.painter().text(
             egui::pos2(caption.min.x + 10.0, caption.center().y),
             egui::Align2::LEFT_CENTER,
-            name,
+            &name,
             egui::FontId::proportional(12.0),
-            if focused { t.text } else { t.text_muted },
+            ink,
         );
+        crate::icons::paint(ui, egui::Rect::from_center_size(egui::pos2(caption.max.x - 14.0, caption.center().y), egui::vec2(12.0, 12.0)), "chevron-down", 12.0, ink);
+        egui::Popup::menu(&hit).open_memory(hit.clicked().then_some(egui::SetOpenCommand::Toggle)).show(|ui| {
+            ui.set_min_width(220.0);
+            for (id, label) in &docs {
+                if ui.selectable_label(*id == pair[k], label).clicked() {
+                    chosen = Some((k, *id));
+                    ui.close();
+                }
+            }
+        });
         let body = egui::Rect::from_min_max(egui::pos2(r.min.x, r.min.y + caption_h), r.max);
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(body).id_salt(("split-half", k)));
         child.set_clip_rect(body);
         crate::canvas::document_area(app, index, &mut child);
     }
     ui.painter().vline(rect.min.x + half_w, rect.y_range(), egui::Stroke::new(gap, t.border));
+    if let Some((k, id)) = chosen {
+        if id == pair[1 - k] {
+            // The other pane's document: the two trade places; the active tab stays the same.
+            pair.swap(0, 1);
+            app.split = Some(pair);
+        } else {
+            pair[k] = id;
+            app.split = Some(pair);
+            app.active = app.views.iter().position(|v| v.id == id);
+            app.split_focus = k;
+        }
+    }
 }
 
 /// Split with a second copy of the active file, read from disk: one file can't be two tabs, so
