@@ -149,6 +149,7 @@ impl PdfCraftApp {
             document_copy: None,
             unlock_prompt: None,
             full_screen: false,
+            focus_level: 0,
             inbox: Default::default(),
             startup_inbox: Default::default(),
             startup_superseded: false,
@@ -610,13 +611,27 @@ impl eframe::App for PdfCraftApp {
         if self.draws_window_frame() {
             window_controls::resize_edges(&ctx);
         }
-        chrome::tab_strip(self, ui);
-        chrome::mode_bar(self, ui);
+        // F11 cycles focus mode: all shown, menus and panels hidden, tab strip hidden too.
+        // With no document open there is nothing to focus on.
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F11)) && self.active.is_some() {
+            self.focus_level = (self.focus_level + 1) % 3;
+        }
+        if self.active.is_none() {
+            self.focus_level = 0;
+        }
+        if self.focus_level < 2 {
+            chrome::tab_strip(self, ui);
+        }
+        if self.focus_level == 0 {
+            chrome::mode_bar(self, ui);
+        }
         // Whichever way another tab came to the front, it shows instead of the expanded view.
         if self.all_tools_full && self.all_tools_tab != self.shown_tab() {
             self.all_tools_full = false;
         }
-        side_panels::show(self, ui);
+        if self.focus_level == 0 {
+            side_panels::show(self, ui);
+        }
         let t = theme::Tokens::get(&ctx);
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| {
             if self.mode == Mode::AllTools && self.all_tools_full {
@@ -633,6 +648,21 @@ impl eframe::App for PdfCraftApp {
             }
         });
         self.process_pending_edits();
+        if self.focus_level > 0 {
+            // A way out for mouse users: only while the pointer is in the top-right corner.
+            let screen = ctx.content_rect();
+            let near = ctx.pointer_latest_pos().is_some_and(|p| p.y < 56.0 && p.x > screen.right() - 220.0);
+            if near {
+                egui::Area::new(egui::Id::new("pdfcraft-focus-exit"))
+                    .order(egui::Order::Foreground)
+                    .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-12.0, 8.0))
+                    .show(&ctx, |ui| {
+                        if egui::Frame::popup(ui.style()).show(ui, |ui| ui.button("Exit focus (F11)")).inner.clicked() {
+                            self.focus_level = 0;
+                        }
+                    });
+            }
+        }
         palette::show(self, &ctx);
         dialogs::show(self, &ctx);
         self.show_progress(&ctx);

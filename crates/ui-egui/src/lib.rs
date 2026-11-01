@@ -400,6 +400,8 @@ pub struct PdfCraftApp {
     pub unlock_prompt: Option<UnlockPrompt>,
     pub full_screen: bool,
     /// Files delivered asynchronously (web drag-and-drop, web file picker).
+        /// Focus mode (F11): 0 off, 1 hides the menus and side panels, 2 also the tab strip.
+    pub focus_level: u8,
     pub inbox: Inbox,
     /// The browser's startup `?file=` download. Unlike a deliberate Open or drop, a late
     /// arrival opens in the background once the user has started working (#171).
