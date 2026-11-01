@@ -18,6 +18,8 @@ impl PdfCraftApp {
 }
 
 /// Start split view (the active tab on the left, the next tab on the right) or end it.
+/// Start split view (the active tab on the left, the next tab on the right) or end it. With one
+/// tab open it splits with a copy of that file.
 pub(crate) fn toggle_split(app: &mut PdfCraftApp) {
     if app.split.is_some() {
         app.split = None;
@@ -25,7 +27,7 @@ pub(crate) fn toggle_split(app: &mut PdfCraftApp) {
     }
     let Some(a) = app.active else { return };
     if app.views.len() < 2 {
-        app.notify_error("Open a second PDF to use split view");
+        split_with_copy(app);
         return;
     }
     let b = (a + 1) % app.views.len();
@@ -96,4 +98,53 @@ pub(crate) fn split_area(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         crate::canvas::document_area(app, index, &mut child);
     }
     ui.painter().vline(rect.min.x + half_w, rect.y_range(), egui::Stroke::new(gap, t.border));
+}
+
+/// Split with a second copy of the active file, read from disk: one file can't be two tabs, so
+/// the copy is its own document with no path (Save asks for a name, never overwriting the
+/// original). Edits in one pane don't appear in the other.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn split_with_copy(app: &mut PdfCraftApp) {
+    let Some(a) = app.active else { return };
+    let Some(id) = app.views.get(a).map(|v| v.id) else { return };
+    let path = app.session.get(id).and_then(|d| d.path.clone());
+    let Some(path) = path else {
+        app.notify_error("Save this document before splitting it with itself");
+        return;
+    };
+    if app.has_unsaved_work(a) {
+        app.notify_error("Save your changes first, so the second pane shows them");
+        return;
+    }
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            app.notify_error(format!("Couldn't read {path}: {e}"));
+            return;
+        }
+    };
+    let p = std::path::Path::new(&path);
+    let stem = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "document".to_owned());
+    let name = match p.extension() {
+        Some(ext) => format!("{stem} (copy).{}", ext.to_string_lossy()),
+        None => format!("{stem} (copy)"),
+    };
+    let before = app.views.len();
+    if let Err(e) = app.open_bytes(&name, None, bytes) {
+        app.notify_error(e);
+        return;
+    }
+    // An encrypted file asks for its password first and opens later as an ordinary tab.
+    if app.views.len() > before
+        && let Some(copy) = app.views.last().map(|v| v.id)
+    {
+        app.split = Some([id, copy]);
+        app.split_focus = 0;
+        app.active = app.views.iter().position(|v| v.id == id);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn split_with_copy(app: &mut PdfCraftApp) {
+    app.notify_error("Splitting a document with itself needs the desktop app");
 }

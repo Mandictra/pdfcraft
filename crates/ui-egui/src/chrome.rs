@@ -545,8 +545,18 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             app.focus_level = 1;
                             app.focus_tools_open = false;
                         }
-                        if icons::button(ui, "columns-2", 32.0, app.split.is_some(), "Split view (Ctrl+\\)").clicked() {
+                        let split = icons::button(
+                            ui,
+                            "columns-2",
+                            32.0,
+                            app.split.is_some(),
+                            "Split view (Ctrl+\\). Right-click: split with a copy of this PDF",
+                        );
+                        if split.clicked() {
                             crate::split::toggle_split(app);
+                        }
+                        if split.secondary_clicked() && app.split.is_none() {
+                            crate::split::split_with_copy(app);
                         }
                     });
                     ui.add_space(8.0);

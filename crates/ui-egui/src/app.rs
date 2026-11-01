@@ -629,6 +629,10 @@ impl eframe::App for PdfCraftApp {
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Backslash)) {
             crate::split::toggle_split(self);
         }
+                // Ctrl+Shift+\ splits with a copy of this file, even when other tabs are open.
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Backslash)) && self.split.is_none() {
+            crate::split::split_with_copy(self);
+        }
         crate::split::reconcile(self);
         if self.focus_level < 2 {
             chrome::tab_strip(self, ui);
