@@ -19,6 +19,8 @@ pub const TOOLS_WIDTH: f32 = 272.0;
 pub const SIDE_WIDTH: f32 = 330.0;
 const TOOLS_RANGE: RangeInclusive<f32> = 240.0..=520.0;
 const SIDE_RANGE: RangeInclusive<f32> = 260.0..=520.0;
+/// The page keeps at least this much width; panes that would take it are hidden, not closed.
+const MIN_PAGE_WIDTH: f32 = 400.0;
 /// Version of the saved `side_panels` value.
 const VERSION: u64 = 1;
 /// Deepest split tree the old layout migration walks; the old renderer allowed far fewer.
@@ -355,7 +357,8 @@ fn state_of(panels: &SidePanels, pane: Pane) -> PaneState {
 }
 
 /// The panes that show this frame, outermost first on a shared edge.
-fn open_panes(app: &PdfCraftApp) -> Vec<Pane> {
+/// The panes that show this frame, outermost first on a shared edge. `avail` is the window width.
+fn open_panes(app: &PdfCraftApp, avail: f32) -> Vec<Pane> {
     let mut open = Vec::new();
     // Read mode hides the tools, not the navigation panes.
     if app.left_open && app.mode != Mode::Read {
@@ -364,6 +367,13 @@ fn open_panes(app: &PdfCraftApp) -> Vec<Pane> {
     // Home and Combine files have no side panel; the choice is kept for the next document.
     if app.active.is_some() && app.right.is_some() {
         open.push(Pane::Side);
+    }
+    // Narrow window: hide panes from the last (the Inspector) back until the page has room.
+    // `left_open` and `right` stay as they are, so widening the window brings them back.
+    let mut used: f32 = open.iter().map(|p| app.side_panels.width(*p)).sum();
+    while used > avail - MIN_PAGE_WIDTH {
+        let Some(pane) = open.pop() else { break };
+        used -= app.side_panels.width(pane);
     }
     open
 }
@@ -381,7 +391,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     if app.mode == Mode::AllTools && app.all_tools_full {
         return;
     }
-    let open = open_panes(app);
+    let open = open_panes(app, ui.ctx().content_rect().width());
     if open.is_empty() {
         return;
     }
