@@ -84,6 +84,8 @@ impl PdfCraftApp {
             "last_views": self.last_views_to_save(),
             // Kept only while the preference is on.
             "last_session": self.reopen_last_session.then(|| self.session_to_save()),
+            "focus_level": self.focus_level,
+            "split": self.split_paths(),
             "reload_changed_files": self.reload_changed_files,
             "system_title_bar": self.system_title_bar,
             "pinned_folders": self.pinned.folders,
@@ -196,6 +198,12 @@ impl PdfCraftApp {
         }
         self.restore_last_views(&v["last_views"]);
         self.last_session = last_session::LastSession::from_json(&v["last_session"]);
+        if let Some(level) = v["focus_level"].as_u64() {
+            self.focus_level = u8::try_from(level.min(2)).unwrap_or(0);
+        }
+        self.saved_split = v["split"]
+            .as_array()
+            .and_then(|a| Some([a.first()?.as_str()?.to_owned(), a.get(1)?.as_str()?.to_owned()]));
         if let Some(on) = v["system_title_bar"].as_bool() {
             self.system_title_bar = on;
         }

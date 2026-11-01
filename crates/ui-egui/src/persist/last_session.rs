@@ -132,6 +132,21 @@ impl PdfCraftApp {
             if active.is_some() {
                 self.active = active;
             }
+                        // The split from last time returns when both of its files did.
+            if let Some([a, b]) = self.saved_split.take() {
+                let find = |app: &Self, p: &str| {
+                    app.views
+                        .iter()
+                        .find(|v| app.session.get(v.id).and_then(|d| d.path.as_deref()).map(absolute).as_deref() == Some(p))
+                        .map(|v| v.id)
+                };
+                if let (Some(x), Some(y)) = (find(self, &absolute(&a)), find(self, &absolute(&b)))
+                    && x != y
+                {
+                    self.split = Some([x, y]);
+                    self.split_focus = 0;
+                }
+            }
         }
         #[cfg(target_arch = "wasm32")]
         let _ = (last, skip);

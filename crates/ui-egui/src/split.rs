@@ -5,9 +5,15 @@ use crate::PdfCraftApp;
 use crate::theme::Tokens;
 
 impl PdfCraftApp {
+    /// Whether split view is on screen: the active tab is one of the two documents.
+    pub(crate) fn split_showing(&self) -> bool {
+        let Some(pair) = self.split else { return false };
+        self.active.and_then(|i| self.views.get(i)).is_some_and(|v| pair.contains(&v.id))
+    }
+
     /// The view index of the pane that is not active, while split view shows.
     pub(crate) fn split_partner(&self) -> Option<usize> {
-        if self.full_screen {
+        if self.full_screen || !self.split_showing() {
             return None;
         }
         let pair = self.split?;
@@ -15,9 +21,15 @@ impl PdfCraftApp {
         let other = pair.into_iter().find(|id| *id != active_id)?;
         self.views.iter().position(|v| v.id == other)
     }
+
+    /// The two files' paths, when both have one (a copy made for a split has none).
+    pub(crate) fn split_paths(&self) -> Option<[String; 2]> {
+        let pair = self.split?;
+        let path = |id| self.session.get(id).and_then(|d| d.path.clone());
+        Some([path(pair[0])?, path(pair[1])?])
+    }
 }
 
-/// Start split view (the active tab on the left, the next tab on the right) or end it.
 /// Start split view (the active tab on the left, the next tab on the right) or end it. With one
 /// tab open it splits with a copy of that file.
 pub(crate) fn toggle_split(app: &mut PdfCraftApp) {
@@ -35,23 +47,18 @@ pub(crate) fn toggle_split(app: &mut PdfCraftApp) {
     app.split_focus = 0;
 }
 
-/// Keep the split consistent with the tabs, once per frame before drawing: it ends when a pane's
-/// tab closes or no tab is active; the active tab takes the focused pane, or moves the focus when
-/// it is already the other pane.
+/// Keep the split consistent with the tabs, once per frame before drawing: it ends when either
+/// document closes. The focus follows the active tab while that is one of the two; any other
+/// tab just hides the split until its group tab is clicked.
 pub(crate) fn reconcile(app: &mut PdfCraftApp) {
-    let Some(mut pair) = app.split else { return };
-    let active_id = app.active.and_then(|i| app.views.get(i)).map(|v| v.id);
-    let open = pair.iter().all(|id| app.views.iter().any(|v| v.id == *id));
-    let Some(active_id) = active_id.filter(|_| open) else {
+    let Some(pair) = app.split else { return };
+    if !pair.iter().all(|id| app.views.iter().any(|v| v.id == *id)) {
         app.split = None;
         return;
-    };
-    if let Some(k) = pair.iter().position(|id| *id == active_id) {
+    }
+    let active_id = app.active.and_then(|i| app.views.get(i)).map(|v| v.id);
+    if let Some(k) = pair.iter().position(|id| Some(*id) == active_id) {
         app.split_focus = k;
-    } else {
-        let focus = app.split_focus.min(1);
-        pair[focus] = active_id;
-        app.split = Some(pair);
     }
 }
 
@@ -99,7 +106,13 @@ pub(crate) fn split_area(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             egui::FontId::proportional(12.0),
             ink,
         );
-        crate::icons::paint(ui, egui::Rect::from_center_size(egui::pos2(caption.max.x - 14.0, caption.center().y), egui::vec2(12.0, 12.0)), "chevron-down", 12.0, ink);
+        crate::icons::paint(
+            ui,
+            egui::Rect::from_center_size(egui::pos2(caption.max.x - 14.0, caption.center().y), egui::vec2(12.0, 12.0)),
+            "chevron-down",
+            12.0,
+            ink,
+        );
         egui::Popup::menu(&hit).open_memory(hit.clicked().then_some(egui::SetOpenCommand::Toggle)).show(|ui| {
             ui.set_min_width(220.0);
             for (id, label) in &docs {

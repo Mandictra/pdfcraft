@@ -126,7 +126,58 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             // (with whether it was just released).
                             let mut slots = Vec::with_capacity(app.views.len());
                             let mut dragged = None;
+                            // Split view: the two documents share one tab, where the earlier of them sits.
+                            let group = app.split.and_then(|pair| {
+                                let a = app.views.iter().position(|v| v.id == pair[0])?;
+                                let b = app.views.iter().position(|v| v.id == pair[1])?;
+                                Some((a.min(b), a.max(b)))
+                            });
+                            let mut group_rect = None;
                             for i in 0..app.views.len() {
+                                if let Some((first, second)) = group {
+                                    if i == second {
+                                        // Shares the group tab's place, so drop positions still count both.
+                                        if let Some(rect) = group_rect {
+                                            slots.push((i, rect));
+                                        }
+                                        continue;
+                                    }
+                                    if i == first {
+                                        let names: Vec<String> =
+                                            [first, second].iter().filter_map(|&k| crate::canvas::tab_label(app, k).map(|s| s.to_string())).collect();
+                                        let label = names.join("  |  ");
+                                        let dirty = [first, second].iter().any(|&k| app.session.get(app.views[k].id).is_some_and(|d| d.dirty));
+                                        let mut ungroup = None;
+                                        let response = tab(
+                                            ui,
+                                            TabSpec {
+                                                id: ui.scope_id().with("split-group-tab"),
+                                                theme: &t,
+                                                icon: "columns-2",
+                                                name: &label,
+                                                file: None,
+                                                dirty,
+                                                active: app.active == Some(first) || app.active == Some(second),
+                                                index: usize::MAX,
+                                                cap,
+                                                height: tab_h,
+                                                draggable: false,
+                                            },
+                                            &mut ungroup,
+                                        );
+                                        slots.push((i, response.rect));
+                                        group_rect = Some(response.rect);
+                                        if response.clicked() {
+                                            let focused = app.split.and_then(|p| app.views.iter().position(|v| v.id == p[app.split_focus.min(1)]));
+                                            app.active = Some(focused.unwrap_or(first));
+                                        }
+                                        // The × (or a middle click) ends the split; the documents stay open.
+                                        if ungroup.is_some() || response.middle_clicked() {
+                                            app.split = None;
+                                        }
+                                        continue;
+                                    }
+                                }
                                 let Some(doc) = app.session.get(app.views[i].id) else { continue };
                                 let Some(name) = crate::canvas::tab_label(app, i) else { continue };
                                 let dirty = doc.dirty;
@@ -192,10 +243,8 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             {
                                 let screen = ui.ctx().content_rect();
                                 // No pointer position means it was released outside the window.
-                                let torn_off = ui
-                                    .ctx()
-                                    .pointer_latest_pos()
-                                    .is_none_or(|p| p.y > row.bottom() + TEAR_OFF_DISTANCE || !screen.contains(p));
+                                let torn_off =
+                                    ui.ctx().pointer_latest_pos().is_none_or(|p| p.y > row.bottom() + TEAR_OFF_DISTANCE || !screen.contains(p));
                                 if torn_off {
                                     action = Some(crate::tab_context::Action::Detach(id));
                                 }
@@ -541,7 +590,7 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         if icons::button(ui, "info", 32.0, false, &tip).clicked() {
                             app.dialog = Some(Dialog::Properties(PropsTab::Description));
                         }
-                                                if icons::button(ui, "maximize-2", 32.0, false, "Focus mode (F11)").clicked() {
+                        if icons::button(ui, "maximize-2", 32.0, false, "Focus mode (F11)").clicked() {
                             app.focus_level = 1;
                             app.focus_tools_open = false;
                         }

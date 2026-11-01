@@ -152,6 +152,7 @@ impl PdfCraftApp {
             focus_level: 0,
             focus_tools_open: false,
             split: None,
+            saved_split: None,
             split_focus: 0,
             inbox: Default::default(),
             startup_inbox: Default::default(),
@@ -622,9 +623,8 @@ impl eframe::App for PdfCraftApp {
                 self.focus_tools_open = false;
             }
         }
-        if self.active.is_none() {
-            self.focus_level = 0;
-        }
+        // Home has no page to focus on, but the chosen level is kept for the next document.
+        let focus = if self.active.is_some() { self.focus_level } else { 0 };
                 // Ctrl+\ splits the window into two documents, or ends the split.
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Backslash)) {
             crate::split::toggle_split(self);
@@ -634,17 +634,17 @@ impl eframe::App for PdfCraftApp {
             crate::split::split_with_copy(self);
         }
         crate::split::reconcile(self);
-        if self.focus_level < 2 {
+        if focus < 2 {
             chrome::tab_strip(self, ui);
         }
-        if self.focus_level == 0 {
+        if focus == 0 {
             chrome::mode_bar(self, ui);
         }
         // Whichever way another tab came to the front, it shows instead of the expanded view.
         if self.all_tools_full && self.all_tools_tab != self.shown_tab() {
             self.all_tools_full = false;
         }
-        if self.focus_level == 0 {
+        if focus == 0 {
             side_panels::show(self, ui);
         }
         let t = theme::Tokens::get(&ctx);
@@ -657,14 +657,14 @@ impl eframe::App for PdfCraftApp {
                     None => home::show(self, ui),
                     Some(index) => match compare_ui::side_by_side(self, index) {
                         Some((old, new)) => compare_ui::compare_area(self, old, new, ui),
-                        None if self.split.is_some() => crate::split::split_area(self, ui),
+                        None if self.split_showing() => crate::split::split_area(self, ui),
                         None => canvas::document_area(self, index, ui),
                     },
                 }
             }
         });
         self.process_pending_edits();
-        if self.focus_level > 0 {
+        if focus > 0 {
             // A way out for mouse users: only while the pointer is in the top-right corner.
             let screen = ctx.content_rect();
             let near = ctx.pointer_latest_pos().is_some_and(|p| p.y < 56.0 && p.x > screen.right() - 220.0);

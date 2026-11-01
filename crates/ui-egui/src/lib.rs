@@ -408,6 +408,8 @@ pub struct PdfCraftApp {
         /// Split view: the documents in the left and right panes, and which pane has the focus.
     pub split: Option<[pdfcraft_engine::DocId; 2]>,
     pub split_focus: usize,
+        /// The split's two file paths from the last session, applied when the files reopen.
+    pub saved_split: Option<[String; 2]>,
     pub inbox: Inbox,
     /// The browser's startup `?file=` download. Unlike a deliberate Open or drop, a late
     /// arrival opens in the background once the user has started working (#171).
